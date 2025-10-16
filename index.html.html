@@ -1,0 +1,1040 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Shelter Locator — San Mateo, Isabela</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css"/>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0078d7">
+  <link rel="apple-touch-icon" href="icon-maskable-192.png">
+
+  <style>
+    html, body { height:100%; margin:0; font-family:Segoe UI, Roboto, Arial, sans-serif; }
+    #map { height:100%; }
+
+    /* Buttons & panels (unchanged) */
+    #menuButton { position:absolute; bottom:20px; left:20px; width:55px; height:55px; border-radius:50%; background:#0078d7; color:#fff; font-size:24px; border:none; cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,.3); z-index:1500; }
+    #menuDrawer { position:absolute; bottom:90px; left:20px; background:#fff; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,.2); width:250px; padding:15px; z-index:1500; transform:translateY(150%); opacity:0; transition:all .3s ease; }
+    #menuDrawer.show { transform:translateY(0); opacity:1; }
+    #menuDrawer button, #menuDrawer select, #menuDrawer input { width:100%; margin-top:10px; padding:10px; border-radius:8px; border:1px solid #ccc; font-size:14px; cursor:pointer; }
+    #menuDrawer button { background:#0078d7; color:#fff; font-weight:600; }
+    #menuDrawer button:hover { background:#005fa3; }
+    #adminPanel { position:absolute; top:20px; right:20px; width:360px; background:#fff; border-radius:12px; box-shadow:0 8px 20px rgba(0,0,0,0.25); display:none; z-index:2000; padding:20px; }
+    #adminPanel input, #adminPanel button, #adminPanel select { width:100%; margin-top:10px; padding:8px; border-radius:6px; font-size:14px; }
+    #adminPanel button { border:none; cursor:pointer; font-weight:600; }
+    #adminLogin { background:#0078d7; color:#fff; }
+    #adminLogout { background:#ff4757; color:#fff; }
+    #saveShelter { background:#28a745; color:#fff; }
+    #updateShelter { background:#ffc107; color:#000; }
+    #deleteShelter { background:#ffa502; color:#fff; }
+    #nearestButton { position:absolute; bottom:20px; right:20px; width:55px; height:55px; border-radius:50%; background:#28a745; color:#fff; font-size:20px; border:none; cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,.3); z-index:1500; }
+    #nearestButton:hover { background:#1e7e34; }
+    #cancelButton { display: none; /* hidden initially */ }
+    #cancelButton { position:absolute; bottom:90px; right:20px; width:55px; height:55px; border-radius:50%; background:#dc3545; color:#fff; font-size:22px; border:none; cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,.3); z-index:1500; }
+    #cancelButton:hover { background:#a71d2a; }
+    #installButton { position:absolute; bottom:160px; right:20px; width:55px; height:55px; border-radius:50%; background:#0078d7; color:#fff; font-size:18px; border:none; cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,.3); z-index:1500; display:none; }
+    #installButton:hover { background:#005fa3; }
+    
+    /* show my location */
+  /* My Location button: floating, mobile-friendly */
+  #myLocationButton {
+    position: absolute;
+    bottom: 20px;          /* distance from bottom */
+    left: 50%;             /* centered horizontally */
+    transform: translateX(-50%);
+    min-width: 60px;       /* minimum touch area */
+    height: 60px;          /* circle-like */
+    border-radius: 30px;   /* fully rounded */
+    background: #0078d7;   
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,.3);
+    z-index: 1500;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0 10px;
+    text-align: center;
+  }
+
+  #myLocationButton:hover {
+    background: #005fa3;
+  }
+
+  /* Optional: smaller font on smaller screens */
+  @media (max-width: 400px) {
+    #myLocationButton {
+      font-size: 12px;
+      min-width: 50px;
+      height: 50px;
+      border-radius: 25px;
+    }
+  }
+
+
+    /* GPS Accuracy Legend */
+
+   /* Minimize button for GPS accuracy */
+  #gpsLegend {
+    position: absolute;
+    left: 20px;
+    top: 30%;
+    transform: translateY(-50%);
+    background: rgba(217, 206, 206, 0.764);
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(217, 206, 206, 0.764);
+    padding: 8px;
+    font-size: 14px;
+    line-height: 1.4;
+    z-index: 1600;
+    transition: all 0.3s ease;
+  }
+
+  #gpsLegend.minimized #gpsLegendContent {
+    display: none;
+  }
+
+  #gpsLegendHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  #toggleLegendBtn {
+    background: #0078d7;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    cursor: pointer;
+    font-weight: bold;
+    line-height: 1;
+  }
+  #toggleLegendBtn:hover {
+    background: #005fa3;
+  }
+
+
+  /* exit button admin panel */
+  #exitAdmin {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: #dc3545;
+    color: white;
+    border: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: 0.2s;
+  }
+
+  #exitAdmin:hover {
+    background: #b02a37;
+  }
+
+    /* small popup buttons */
+    .popupButton { display:inline-block; padding:6px 8px; margin-top:6px; border-radius:6px; border:none; cursor:pointer; background:#0078d7; color:#fff; font-weight:600; text-decoration:none; }
+    .popupButton.edit { background:#ffc107; color:#000; margin-left:6px; }
+  </style>
+</head>
+<body>
+  
+  <div id="map"></div>
+
+ <!-- GPS Accuracy Legend -->
+<div id="gpsLegend" class="gps-legend">
+  <div id="gpsLegendHeader">
+    <strong>GPS Accuracy</strong>
+    <button id="toggleLegendBtn">−</button>
+  </div>
+  <div id="gpsLegendContent">
+    <div><span class="colorBox green"></span> Good 🟩(&lt;20m)</div>
+    <div><span class="colorBox orange"></span> Medium 🟧(20–100m)</div>
+    <div><span class="colorBox red"></span> Poor 🟥(&gt;100m)</div>
+  </div>
+</div>
+
+
+
+  <!-- Buttons -->
+  <button id="menuButton">☰</button>
+  <div id="menuDrawer">
+    <label>Shelters</label>
+    <select id="shelterSelect"><option value="">-- Select Shelter --</option></select>
+    <button id="navigateButton">Navigate</button>
+    <button id="downloadArea">Download</button>
+    <input type="file" id="uploadRoute" accept=".geojson,.json" style="display:none;"/>
+    <button id="loadOffline">📂 Load Offline Route</button>
+  </div>
+  <button id="nearestButton">🧭</button>
+  <button id="cancelButton">✖</button>
+  <button id="myLocationButton">Show My Location</button>
+  <button id="installButton">⬇️</button>
+
+  <!-- Admin Panel -->
+  <div id="adminPanel">
+    <h3 style="margin:0;">🔑 Admin Panel</h3>
+  <button id="exitAdmin"
+    style="background:#dc3545; color:white; border:none; width:28px; height:28px; border-radius:50%; cursor:pointer; font-size:16px; line-height:1;">
+    ✕
+  </button>
+    <div id="loginForm">
+      <input type="text" id="adminUser" placeholder="Username">
+      <input type="password" id="adminPass" placeholder="Password">
+      <button id="adminLogin">Login</button>
+    </div>
+
+    <div id="shelterForm" style="display:none;">
+      <input type="text" id="shelterName" placeholder="Shelter Name">
+      <input type="text" id="shelterLat" placeholder="Latitude">
+      <input type="text" id="shelterLng" placeholder="Longitude">
+      <input type="number" id="shelterCap" placeholder="Capacity (Total)">
+      <input type="text" id="shelterManager" placeholder="Evacuation Manager Name">
+      <input type="text" id="shelterContact" placeholder="Contact Number">
+      <input type="number" id="shelterUsed" placeholder="Current Evacuees (Used)">
+
+      <select id="shelterStatus">
+        <option value="Open">Open</option>
+        <option value="Closed">Closed</option>
+      </select>
+
+      <div style="display:flex; gap:8px;">
+        <button id="saveShelter" style="width:100%;">Save Shelter</button>
+
+      </div>
+      
+      <label>Edit existing shelter</label>
+      <select id="editShelterSelect">
+        <option value="">-- Select Shelter to Edit --</option>
+      </select>
+      <button id="loadShelterEdit" style="width:100%; background:#ffc107; color:#000;">Load for Edit</button>
+
+
+      <label style="margin-top:10px;">Delete shelter</label>
+      <select id="deleteShelterSelect">
+        <option value="">-- Select Shelter to Delete --</option>
+      </select>
+      <button id="deleteShelter" style="width:100%">Delete Selected</button>
+
+      <button id="adminLogout">Logout</button>
+    </div>
+  </div>
+
+  <!-- Leaflet -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+
+  <!-- Firebase & App Logic -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      getDocs,
+      addDoc,
+      doc,
+      deleteDoc,
+      updateDoc,
+      query,
+      where
+    } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+    import { onSnapshot } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAw8Dx1jNLOQwPlNRIPWPI6scpD-DF8CkE",
+      authDomain: "shelter-locator-ee43c.firebaseapp.com",
+      projectId: "shelter-locator-ee43c",
+      storageBucket: "shelter-locator-ee43c.firebasestorage.app",
+      messagingSenderId: "662533102169",
+      appId: "1:662533102169:web:a6c621c1f5d368676a6f48",
+      measurementId: "G-MQY5TQ2GQG"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // 🔑 ORS API key (your key)
+    const ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjRlOWEwZmJkZjAxODRmNjU5ODQzNzk2NTk3ZGRhMzFhIiwiaCI6Im11cm11cjY0In0=";
+
+    const ADMIN_USER = "admin", ADMIN_PASS = "1234";
+    let isAdmin = false;
+    let shelters = []; // will hold { id, name, coords, manager, contact, capacityUsed, capacityTotal, status }
+    let userMarker, accuracyCircle, routeLine = null;
+    let shelterMarkers = [];
+    let currentRouteId = null, currentRouteName = null;
+    let editingDocId = null; // when editing an existing shelter
+
+    const map = L.map("map").setView([16.8827,121.5945],14);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
+
+    function getAccuracyColor(acc) {
+      if (acc <= 20) return "green";
+      if (acc <= 100) return "orange";
+      return "red";
+    }
+
+    // Helper: flatten latlngs & convert polyline to GeoJSON line feature
+    function polylineToGeoJSON(layer){
+      try {
+        const ll = layer.getLatLngs();
+        // flatten nested arrays
+        function flatten(arr) {
+          if (!arr || arr.length===0) return [];
+          if (arr[0] && typeof arr[0].lat === "number") return arr.map(p=>[p.lng,p.lat]);
+          return arr.flatMap(sub => flatten(sub));
+        }
+        const coords = flatten(ll);
+        return { type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {} };
+      } catch(e){
+        console.error("polylineToGeoJSON error:", e);
+        return null;
+      }
+    }
+
+    // Load shelters with doc id
+    function loadSheltersRealtime() {
+      const sheltersRef = collection(db, "shelters");
+      onSnapshot(sheltersRef, (snapshot) => {
+        shelters = [];
+        snapshot.forEach((d) => {
+          shelters.push({ id: d.id, ...d.data() });
+        });
+        renderShelters();
+        updateDeleteSelect();
+        updateEditSelect();
+      }, (error) => {
+        console.error("Realtime load error:", error);
+      });
+    }
+
+
+    // ✅ Function: enable/disable Navigate button based on selected shelter
+    function updateNavigateButton() {
+      const sel = document.getElementById("shelterSelect");
+      const navBtn = document.getElementById("navigateButton");
+      const id = sel.value;
+      if (!id) {
+        navBtn.disabled = true;
+        navBtn.style.background = "#ccc";
+        navBtn.style.cursor = "not-allowed";
+        return;
+      }
+
+      const s = shelters.find(x => x.id === id);
+      if (!s || (s.status && s.status.toLowerCase() === "closed")) {
+        navBtn.disabled = true;
+        navBtn.style.background = "#999"; // grey if closed
+        navBtn.style.cursor = "not-allowed";
+      } else {
+        navBtn.disabled = false;
+        navBtn.style.background = "#0078d7"; // blue when open
+        navBtn.style.cursor = "pointer";
+      }
+    }
+
+
+    // Render markers and the select
+    function renderShelters(){
+      shelterMarkers.forEach(m=>map.removeLayer(m));
+      shelterMarkers = [];
+      const sel = document.getElementById("shelterSelect");
+      sel.innerHTML = "<option value=''>-- Select Shelter --</option>";
+      shelters.forEach(s=>{
+        if (!s.coords) return;
+        // coords may be array [lat,lng] or object or string
+        let lat, lng;
+        if (Array.isArray(s.coords)) { lat = parseFloat(s.coords[0]); lng = parseFloat(s.coords[1]); }
+        else if (typeof s.coords === "object") { lat = parseFloat(s.coords.lat); lng = parseFloat(s.coords.lng); }
+        else if (typeof s.coords === "string") { const p=s.coords.split(","); lat=parseFloat(p[0]); lng=parseFloat(p[1]); }
+        if (isNaN(lat) || isNaN(lng)) return;
+
+        const capacityUsed = s.capacityUsed || 0;
+        const capacityTotal = s.capacityTotal || s.capacity || 0;
+        const status = s.status || "Open";
+
+        // 🧠 Auto-mark shelter as FULL if capacity is maxed out
+        let isFull = false;
+        if (capacityTotal > 0 && capacityUsed >= capacityTotal) {
+          isFull = true;
+        }
+
+        const showRouteBtn = (status.toLowerCase() === "open" && !isFull)
+          ? `<a class="popupButton" href="javascript:void(0)" onclick="routeToId('${s.id}')">🗺️ Route Here</a>`
+          : "";
+
+        const popupHtml = `
+  <div>
+    <b>${s.name}</b><br>
+    👨‍💼 Manager: ${s.manager || "N/A"}<br>
+    ☎️ Contact: ${s.contact || "N/A"}<br>
+    👥 Capacity: ${capacityUsed} / ${capacityTotal}<br>
+    Status: <b style="color:${status === "Closed" ? "red" : isFull ? "orange" : "green"};">${isFull ? "Full" : status}</b><br>
+
+    <div style="margin-top:8px;">
+      ${showRouteBtn}
+    </div>
+  </div>
+`;
+
+
+        const markerColor = (status === "Closed") ? "red" : (isFull ? "orange" : "green");
+        const marker = L.circleMarker([lat, lng], {
+          radius: 8,
+          color: markerColor,
+          fillOpacity: 0.9
+        })
+          .addTo(map)
+          .bindPopup(popupHtml);
+
+        shelterMarkers.push(marker);
+
+        const opt = document.createElement("option");
+        opt.value = s.id;
+        opt.textContent = s.name;
+        sel.appendChild(opt);
+      });
+      updateNavigateButton();
+    }
+
+    // ✅ Function: enable/disable Navigate & Download buttons based on selected shelter
+    function updateActionButtons() {
+      const sel = document.getElementById("shelterSelect");
+      const navBtn = document.getElementById("navigateButton");
+      const dlBtn = document.getElementById("downloadArea");
+      const id = sel.value;
+
+      // if nothing selected
+      if (!id) {
+        [navBtn, dlBtn].forEach(btn => {
+          btn.disabled = true;
+          btn.style.background = "#ccc";
+          btn.style.cursor = "not-allowed";
+        });
+        return;
+      }
+
+      const s = shelters.find(x => x.id === id);
+      if (!s) return;
+
+      const capacityUsed = s.capacityUsed || 0;
+      const capacityTotal = s.capacityTotal || s.capacity || 0;
+      const isFull = capacityTotal > 0 && capacityUsed >= capacityTotal;
+      const isClosed = s.status && s.status.toLowerCase() === "closed";
+
+      // disable both if full or closed
+      if (isClosed || isFull) {
+        [navBtn, dlBtn].forEach(btn => {
+          btn.disabled = true;
+          btn.style.background = "#999"; // grey when full/closed
+          btn.style.cursor = "not-allowed";
+        });
+      } else {
+        [navBtn, dlBtn].forEach(btn => {
+          btn.disabled = false;
+          btn.style.background = "#0078d7"; // blue when open
+          btn.style.cursor = "pointer";
+        });
+      }
+    }
+
+
+    // Update edit select (value = doc id)
+    function updateEditSelect() {
+     const sel = document.getElementById("editShelterSelect");
+     sel.innerHTML = "<option value=''>-- Select Shelter to Edit --</option>";
+    shelters.forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = s.name;
+      sel.appendChild(opt);
+    });
+    updateActionButtons();
+    }
+
+
+    // Load shelter details into form for editing (admin panel)
+    document.getElementById("loadShelterEdit").onclick = () => {
+      const id = document.getElementById("editShelterSelect").value;
+      if (!id) return alert("⚠️ Please select a shelter to edit");
+      editShelter(id);
+    };
+
+
+    // 🔄 Update navigate button when shelter selection changes
+    document.getElementById("shelterSelect").addEventListener("change", updateNavigateButton);
+
+    // 🔄 Update buttons whenever a shelter is selected
+    document.getElementById("shelterSelect").addEventListener("change", updateActionButtons);
+
+
+    // ✅ Navigate button: only works for OPEN shelters
+    document.getElementById("navigateButton").onclick = () => {
+      const id = document.getElementById("shelterSelect").value;
+      if (!id) return alert("⚠️ Please select a shelter first");
+      const s = shelters.find(x => x.id === id);
+      if (!s) return alert("⚠️ Shelter not found");
+
+      const capacityUsed = s.capacityUsed || 0;
+      const capacityTotal = s.capacityTotal || s.capacity || 0;
+      const isFull = capacityTotal > 0 && capacityUsed >= capacityTotal;
+      const isClosed = s.status && s.status.toLowerCase() === "closed";
+
+      if (isClosed) return alert("🚫 This shelter is closed. Navigation is disabled.");
+      if (isFull) return alert("🚫 This shelter is full. Navigation is disabled.");
+
+      routeToId(id);
+    };
+
+
+
+    // Delete shelter by doc id
+    document.getElementById("deleteShelter").onclick = async () => {
+      if (!isAdmin) return alert("Unauthorized");
+      const id = document.getElementById("deleteShelterSelect").value;
+      if (!id) return alert("⚠️ Please select a shelter to delete");
+      const name = (shelters.find(x=>x.id===id) || {}).name || id;
+      if (!confirm(`Delete "${name}"?`)) return;
+      try {
+        await deleteDoc(doc(db, "shelters", id));
+        shelters = shelters.filter(s => s.id !== id);
+        renderShelters();
+        updateDeleteSelect();
+        alert(`✅ Deleted "${name}"`);
+      } catch (e) {
+        console.error("Delete error:", e);
+        alert("⚠️ Delete failed");
+      }
+    };
+
+    // ORS route distance (keeps same behavior)
+    async function getRouteDistance(start, end) {
+      // start: L.LatLng or {lat,lng}; end: [lat,lng] or {lat,lng} or string
+      let startLng = start.lng !== undefined ? start.lng : start.longitude || start[1];
+      let startLat = start.lat !== undefined ? start.lat : start.latitude || start[0];
+
+      let endLat, endLng;
+      if (Array.isArray(end)) { endLat = parseFloat(end[0]); endLng = parseFloat(end[1]); }
+      else if (typeof end === 'object') { endLat = parseFloat(end.lat); endLng = parseFloat(end.lng); }
+      else if (typeof end === 'string') { const p=end.split(','); endLat=parseFloat(p[0]); endLng=parseFloat(p[1]); }
+
+      if (isNaN(startLat) || isNaN(startLng) || isNaN(endLat) || isNaN(endLng)) return Infinity;
+
+      const url = "https://api.openrouteservice.org/v2/directions/driving-car/geojson";
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Authorization": ORS_API_KEY,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            coordinates: [
+              [startLng, startLat],
+              [endLng, endLat]
+            ]
+          })
+        });
+        const data = await res.json();
+        if (data.features && data.features.length > 0) {
+          return data.features[0].properties.summary.distance;
+        }
+      } catch (err) {
+        console.error("ORS error:", err);
+      }
+      return Infinity;
+    }
+
+    // Route using shelter doc id
+    window.routeToId = async function(id){
+      const s = shelters.find(x=>x.id === id);
+      if (!s) return alert("Shelter not found");
+        // 🚫 Block routing if shelter is closed
+      if (s.status && s.status.toLowerCase() === "closed") {
+      alert("🚫 This shelter is closed. Route cannot be generated.");
+      return;
+      }
+      currentRouteId = id; currentRouteName = s.name;
+      if (!userMarker) return alert("📍 Your location is not available yet");
+      let lat, lng;
+      if (Array.isArray(s.coords)) { lat = parseFloat(s.coords[0]); lng = parseFloat(s.coords[1]); }
+      else if (typeof s.coords === "object") { lat = parseFloat(s.coords.lat); lng = parseFloat(s.coords.lng); }
+      else { const p = String(s.coords || '').split(","); lat = parseFloat(p[0]); lng = parseFloat(p[1]); }
+
+      if (isNaN(lat) || isNaN(lng)) return alert("⚠️ Shelter coordinates invalid");
+
+      if (navigator.onLine) {
+        try {
+          const res = await fetch("https://api.openrouteservice.org/v2/directions/driving-car/geojson", {
+            method: "POST",
+            headers: {
+              "Authorization": ORS_API_KEY,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              coordinates: [
+                [userMarker.getLatLng().lng, userMarker.getLatLng().lat],
+                [lng, lat]
+              ]
+            })
+          });
+          const data = await res.json();
+          if (routeLine) map.removeLayer(routeLine);
+          const coords = data.features[0].geometry.coordinates.map(c => [c[1], c[0]]);
+          routeLine = L.polyline(coords, { color: "blue", weight: 5, opacity: 0.7 }).addTo(map);
+          map.fitBounds(routeLine.getBounds());
+        } catch (err) {
+          console.error("ORS routing error:", err);
+          alert("⚠️ Routing failed.");
+        }
+      } else {
+        if (routeLine) map.removeLayer(routeLine);
+        routeLine = L.polyline([userMarker.getLatLng(), [lat,lng]], { color: "blue", dashArray: "5,5" }).addTo(map);
+      }
+      // Show the Cancel button using helper
+      showCancelButton();
+     
+      // center on shelter briefly
+      map.setView([lat,lng], 16);
+    };
+
+    // ✅ Show Cancel button whenever a route is active
+    function showCancelButton() {
+      const cancelBtn = document.getElementById("cancelButton");
+      cancelBtn.style.display = "block";
+    }
+
+
+    // Cancel route
+    document.getElementById("cancelButton").onclick = () => {
+      if (routeLine) { 
+        map.removeLayer(routeLine); 
+        routeLine = null; 
+        currentRouteId = null; 
+        currentRouteName = null; 
+      }
+
+      // Hide Cancel button
+      document.getElementById("cancelButton").style.display = "none";
+
+      alert("❌ Route cancelled.");
+    };
+
+        
+        
+    // 🧭 Nearest shelter (only routes to OPEN shelters)
+    document.getElementById("nearestButton").onclick = async () => {
+      if (!userMarker) return alert("📍 Location not found");
+
+      const userPos = userMarker.getLatLng();
+      let nearest = null;
+      let minDist = Infinity;
+
+      for (let s of shelters) {
+        if (!s.coords) continue;
+
+        // 🚫 Skip closed or full shelters
+        const status = s.status ? s.status.toLowerCase() : "open";
+        const used = s.capacityUsed || 0;
+        const total = s.capacityTotal || s.capacity || 0;
+        const isFull = total > 0 && used >= total;
+
+        if (status === "closed" || isFull) continue;
+
+        const d = await getRouteDistance(userPos, s.coords);
+        if (d < minDist) {
+          minDist = d;
+          nearest = s;
+        }
+      }
+
+      if (nearest) {
+        alert(`🧭 Nearest available shelter: ${nearest.name} (${(minDist / 1000).toFixed(2)} km)`);
+        routeToId(nearest.id);
+      } else {
+        alert("🚫 No available shelters nearby (all are closed or full).");
+      }
+    };
+
+
+    // My Location button: center map on user
+    document.getElementById("myLocationButton").onclick = () => {
+      if (!userMarker) return alert("📍 Your location is not available yet");
+
+      const userPos = userMarker.getLatLng();
+      map.setView(userPos, 16); // zoom to user
+      if (userMarker.getPopup) userMarker.openPopup();
+    };
+
+
+
+    // Admin login/logout (keyboard to toggle panel already)
+    document.addEventListener("keydown",e=>{
+      if(e.ctrlKey&&e.shiftKey&&e.code==="KeyA"){
+        const p=document.getElementById("adminPanel");
+        p.style.display=(p.style.display==="none"||p.style.display==="")?"block":"none";
+      }
+    });
+    // Exit button: close admin panel
+    document.getElementById("exitAdmin").addEventListener("click", () => {
+      document.getElementById("adminPanel").style.display = "none";
+    });
+
+
+    document.getElementById("adminLogin").onclick = () => {
+      const u = document.getElementById("adminUser").value;
+      const p = document.getElementById("adminPass").value;
+      if (u === ADMIN_USER && p === ADMIN_PASS) {
+        isAdmin = true;
+        document.getElementById("loginForm").style.display = "none";
+        document.getElementById("shelterForm").style.display = "block";
+        // optional: focus first field
+        document.getElementById("shelterName").focus();
+      } else alert("❌ Invalid login");
+    };
+
+    document.getElementById("adminLogout").onclick = () => {
+      isAdmin = false;
+      editingDocId = null;
+      document.getElementById("loginForm").style.display = "block";
+      document.getElementById("shelterForm").style.display = "none";
+    };
+
+  
+
+    function clearAdminForm(){
+      document.getElementById("shelterName").value = "";
+      document.getElementById("shelterLat").value = "";
+      document.getElementById("shelterLng").value = "";
+      document.getElementById("shelterCap").value = "";
+      document.getElementById("shelterManager").value = "";
+      document.getElementById("shelterContact").value = "";
+      document.getElementById("shelterUsed").value = "";
+      document.getElementById("shelterStatus").value = "Open";
+      document.getElementById("saveShelter").textContent = "Save Shelter";
+    }
+
+    // Save or Update shelter
+    document.getElementById("saveShelter").onclick = async () => {
+      if (!isAdmin) return alert("Unauthorized");
+
+      const name = document.getElementById("shelterName").value.trim();
+      const lat = parseFloat(document.getElementById("shelterLat").value);
+      const lng = parseFloat(document.getElementById("shelterLng").value);
+      const capTotal = parseInt(document.getElementById("shelterCap").value) || 0;
+      const manager = document.getElementById("shelterManager").value.trim();
+      const contact = document.getElementById("shelterContact").value.trim();
+      const capacityUsed = parseInt(document.getElementById("shelterUsed").value) || 0;
+      const status = document.getElementById("shelterStatus").value;
+
+      if (!name || isNaN(lat) || isNaN(lng)) 
+        return alert("⚠️ Fill name, latitude, and longitude");
+
+      // 🚨 Overcapacity validation (add this block)
+      if (capacityUsed > capTotal) {
+        alert("⚠️ Occupied persons cannot exceed the shelter’s maximum capacity!");
+        return; // stop saving
+      }
+
+      const payload = {
+        name,
+        coords: [lat, lng],
+        manager: manager || null,
+        contact: contact || null,
+        capacityUsed,
+        capacityTotal: capTotal,
+        status
+      };
+
+      try {
+        if (editingDocId) {
+          // update existing
+          await updateDoc(doc(db, "shelters", editingDocId), payload);
+          // update local copy
+          const idx = shelters.findIndex(x => x.id === editingDocId);
+          if (idx !== -1) shelters[idx] = { id: editingDocId, ...payload };
+          alert("✅ Shelter updated");
+          editingDocId = null;
+        } else {
+          // add new
+          const ref = await addDoc(collection(db, "shelters"), payload);
+          shelters.push({ id: ref.id, ...payload });
+          alert("✅ Shelter added");
+        }
+
+        renderShelters();
+        updateDeleteSelect();
+        clearAdminForm();
+      } catch (err) {
+        console.error("Save error:", err);
+        alert("⚠️ Save failed");
+      }
+    };
+
+
+    // Edit shelter (prefill admin form)
+    window.editShelter = function(id){
+      const s = shelters.find(x=>x.id === id);
+      if (!s) return alert("Shelter not found");
+      // make sure admin panel open
+      const panel = document.getElementById("adminPanel");
+      panel.style.display = "block";
+      isAdmin = true;
+      document.getElementById("loginForm").style.display = "none";
+      document.getElementById("shelterForm").style.display = "block";
+
+      editingDocId = id;
+      document.getElementById("shelterName").value = s.name || "";
+      if (Array.isArray(s.coords)) {
+        document.getElementById("shelterLat").value = s.coords[0];
+        document.getElementById("shelterLng").value = s.coords[1];
+      } else if (typeof s.coords === "object") {
+        document.getElementById("shelterLat").value = s.coords.lat || "";
+        document.getElementById("shelterLng").value = s.coords.lng || "";
+      } else {
+        document.getElementById("shelterLat").value = "";
+        document.getElementById("shelterLng").value = "";
+      }
+      document.getElementById("shelterCap").value = s.capacityTotal || s.capacity || "";
+      document.getElementById("shelterManager").value = s.manager || "";
+      document.getElementById("shelterContact").value = s.contact || "";
+      document.getElementById("shelterUsed").value = s.capacityUsed || 0;
+      document.getElementById("shelterStatus").value = s.status || "Open";
+      document.getElementById("saveShelter").textContent = "Update Shelter";
+      // scroll panel into view optionally
+      document.getElementById("shelterName").focus();
+    };
+
+    // Geolocation - keep focus when user moves
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(pos=>{
+        const lat=pos.coords.latitude, lng=pos.coords.longitude, acc=pos.coords.accuracy;
+        const color=getAccuracyColor(acc);
+        if (userMarker) map.removeLayer(userMarker);
+        if (accuracyCircle) map.removeLayer(accuracyCircle);
+        userMarker = L.marker([lat,lng]).addTo(map).bindPopup("📍 You are here");
+        accuracyCircle = L.circle([lat, lng], {
+          radius: Math.max(5, acc),         // use accuracy in meters (don't make it tiny)
+          color,
+          weight: 1,                 // thin border
+          fillColor: color,
+          fillOpacity: 0.09,         // barely visible fill
+          interactive: false          // keep marker clickable even if covered by circle
+        }).addTo(map);
+
+
+        // If user is viewing map manually (panning/zoom), avoid forcing the map; otherwise follow
+        // We'll check whether the user recently interacted with the map
+        if (!userInteractedWithMap) {
+          map.panTo([lat,lng], { animate: true, duration: 0.5 });
+        }
+        // If routing is active, optionally keep route in view - do nothing else here
+      },err=>{ console.error(err); /* don't spam users */ },{enableHighAccuracy:true});
+    } else alert("❌ Geolocation not supported");
+
+    // detect user manual interactions with the map to stop auto-follow
+    let userInteractedWithMap = false;
+    map.on('mousedown touchstart', ()=> userInteractedWithMap = true);
+    // reset interaction flag after a timeout (so auto-follow returns after inactivity)
+    map.on('moveend', ()=> {
+      setTimeout(()=> userInteractedWithMap = false, 4000);
+    });
+
+    // Menu drawer
+    document.getElementById("menuButton").onclick = ()=> document.getElementById("menuDrawer").classList.toggle("show");
+
+    // Download Route
+    document.getElementById("downloadArea").onclick = async () => {
+      const sel = document.getElementById("shelterSelect");
+      const id = sel.value;
+      if (!id) return alert("⚠️ Please select a shelter first");
+
+      const s = shelters.find(x => x.id === id);
+      if (!s) return alert("⚠️ Shelter not found");
+
+      const capacityUsed = s.capacityUsed || 0;
+      const capacityTotal = s.capacityTotal || s.capacity || 0;
+      const isFull = capacityTotal > 0 && capacityUsed >= capacityTotal;
+      const isClosed = s.status && s.status.toLowerCase() === "closed";
+
+      // 🚫 Block downloading if Full or Closed
+      if (isClosed) return alert("🚫 This shelter is closed. Download is disabled.");
+      if (isFull) return alert("🚫 This shelter is full. Download is disabled.");
+
+      // 🧭 Step 1: Automatically create route first
+      await routeToId(id);
+
+      // Wait a moment for route to finish drawing
+      await new Promise(res => setTimeout(res, 1200));
+
+      // 🗺️ Step 2: Then download it automatically
+      if (!routeLine) return alert("⚠️ No route generated yet.");
+      let geo = null;
+      try {
+        if (typeof routeLine.toGeoJSON === "function") geo = routeLine.toGeoJSON();
+      } catch (e) {
+        console.warn("toGeoJSON failed:", e);
+      }
+
+      if (!geo) geo = polylineToGeoJSON(routeLine);
+      if (!geo) return alert("⚠️ Unable to convert route to GeoJSON.");
+
+      const nameBase = currentRouteName || ("route_" + new Date().toISOString().replace(/[:.]/g, '-'));
+      const safeName = String(nameBase).replace(/[^a-z0-9-_]/gi, "_").toLowerCase();
+
+      const blob = new Blob([JSON.stringify(geo)], { type: "application/geo+json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${safeName}.geojson`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 3000);
+
+      alert(`✅ Route saved as "${safeName}.geojson"!`);
+    };
+
+
+
+    // Load Offline Route
+    document.getElementById("loadOffline").onclick = ()=>
+    document.getElementById("uploadRoute").click();
+    document.getElementById("uploadRoute").onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const geo = JSON.parse(evt.target.result);
+          if (routeLine) map.removeLayer(routeLine);
+          routeLine = L.geoJSON(geo, { style: { color: "purple", weight: 5, opacity: .7 } }).addTo(map);
+          map.fitBounds(routeLine.getBounds());
+
+          // ✅ Show Cancel button for offline route
+          showCancelButton();
+
+          alert(`✅ Offline route "${file.name}" loaded!`);
+        } catch (err) {
+          console.error(err);
+          alert("⚠️ Invalid file");
+        }
+      };
+      reader.readAsText(file);
+    };
+
+    // PWA install
+    let deferredPrompt;
+    window.addEventListener("beforeinstallprompt", e=>{
+      e.preventDefault();
+      deferredPrompt = e;
+      document.getElementById("installButton").style.display = "block";
+    });
+    document.getElementById("installButton").onclick = ()=>{
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(()=>{ document.getElementById("installButton").style.display = "none"; });
+    };
+
+    // --- helper for delete select
+    function updateDeleteSelect() {
+      const sel = document.getElementById("deleteShelterSelect");
+      sel.innerHTML = "<option value=''>-- Select Shelter to Delete --</option>";
+      shelters.forEach(s => {
+        const opt = document.createElement("option");
+        opt.value = s.id;
+        opt.textContent = s.name;
+        sel.appendChild(opt);
+      });
+    }
+
+
+    // --- Helper: haversine distance in meters between two coords ---
+    function getDistance(lat1, lon1, lat2, lon2) {
+      function toRad(x){return x*Math.PI/180;}
+      const R = 6371000; // meters
+      const dLat = toRad(lat2-lat1);
+      const dLon = toRad(lon2-lon1);
+      const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(toRad(lat1))*Math.cos(toRad(lat2)) * Math.sin(dLon/2)*Math.sin(dLon/2);
+      const c = 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R*c;
+    }
+
+    // Optional helper (not currently used elsewhere) to find nearest open shelter by straight-line distance
+    function findNearestOpenShelter(userLat, userLng) {
+      const candidates = shelters
+        .map(s => {
+          let lat, lng;
+          if (!s.coords) return null;
+          if (Array.isArray(s.coords)) { lat = parseFloat(s.coords[0]); lng = parseFloat(s.coords[1]); }
+          else if (typeof s.coords === 'object') { lat = parseFloat(s.coords.lat); lng = parseFloat(s.coords.lng); }
+          else { const p=String(s.coords).split(','); lat=parseFloat(p[0]); lng=parseFloat(p[1]); }
+          if (isNaN(lat) || isNaN(lng)) return null;
+          return { ...s, lat, lng };
+        })
+        .filter(Boolean)
+        .filter(s => !(s.status && s.status.toLowerCase() === 'closed'))
+        .map(s => ({ ...s, distance: getDistance(userLat, userLng, s.lat, s.lng) }))
+        .sort((a,b) => a.distance - b.distance);
+
+      return candidates.length ? candidates[0] : null;
+    }
+
+    // Toggle minimize for GPS Legend
+    document.getElementById("toggleLegendBtn").addEventListener("click", () => {
+      const legend = document.getElementById("gpsLegend");
+      const btn = document.getElementById("toggleLegendBtn");
+      legend.classList.toggle("minimized");
+      btn.textContent = legend.classList.contains("minimized") ? "+" : "−";
+    });
+
+
+    // initial real-time load
+    loadSheltersRealtime();
+
+
+  </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
